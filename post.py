@@ -19,13 +19,3 @@ request = urllib2.Request(
         data = data)
  
 print opener.open(request).read()
-
-
-print "starting camera..."
-cam = cv2.VideoCapture(0)
-
-ret, frame = cam.read()
-if ret:
-        cv2.imwrite('galileo.jpg',frame)
-        os.system("scp /home/root/wechat/galileo.jpg root@xdjc.date:/root/wechat_galileo/")
-
