@@ -1,25 +1,43 @@
+#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 import cv2
 import datetime
+import sys
+import os 
+import time
+import urllib2
+
+data = '''<xml>
+ <dangerous><![CDATA["attention!"]]></dangerous>
+</xml>'''
+
+cookies = urllib2.HTTPCookieProcessor()
+opener = urllib2.build_opener(cookies)
 
 conf = {
-    "show_video": True,
-    "use_dropbox": False,
+    "show_video": False,
+    "use_wechat": True,
     "dropbox_key": "YOUR_DROPBOX_KEY",
     "dropbox_secret": "YOUR_DROPBOX_SECRET",
     "dropbox_base_path": "YOUR_DROPBOX_PATH",
     "min_upload_seconds": 3.0,
-    "min_motion_frames": 8,
+    "min_motion_frames": 5,
     "camera_warmup_time": 2.5,
     "delta_thresh": 5,
     "resolution": [640, 480],
     "fps": 16,
-    "min_area": 5000
+    "min_area": 15000
 }
 
 cap = cv2.VideoCapture(0)
+cap.set(3,320)
+cap.set(4,240)
 avg = None
 lastUploaded = datetime.datetime.now()
+motionCounter = 0
+normal_count = 0
+start_flag = 0
+time.sleep(10)
 while True:
     timestamp = datetime.datetime.now()
     text = "ok"
@@ -52,7 +70,7 @@ while True:
         (x, y, w, h) = cv2.boundingRect(c)
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         text = "Attention!"
-    print "[", text, "]"
+    #print "[", text, "]"
     # 在当前帧上标记文本和时间戳
     ts = timestamp.strftime("%A %d %B %Y %I:%M:%S%p")
     #print ts
@@ -60,7 +78,16 @@ while True:
         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     cv2.putText(frame, ts, (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
         0.35, (0, 0, 255), 1)
-    
+
+    normal_count += 1
+    if normal_count == 30:                                                      
+        if start_flag == 0:
+            start_flag = 1
+        cv2.imwrite('/home/root/galileo.jpg',frame)                             
+        os.system("scp /home/root/galileo.jpg root@xdjc.date:/root/wechat_galileo/galileo.jpg")
+        print "upload nothing wrong"                             
+        normal_count = 0               
+
     if text == "Attention!":
         # 判断上传时间间隔是否已经达到
         if (timestamp - lastUploaded).seconds >= conf["min_upload_seconds"]:
@@ -71,17 +98,14 @@ while True:
             # 足够多
             if motionCounter >= conf["min_motion_frames"]:
                 # 判断Dropbox是否被使用
-                if conf["use_dropbox"]:
-                    # write the image to temporary file
-                    t = TempImage()
-                    cv2.imwrite(t.path, frame)
- 
-                    # 将图像上传至Dropbox并删除临时图片
-                    print "[UPLOAD] {}".format(ts)
-                    path = "{base_path}/{timestamp}.jpg".format(
-                        base_path=conf["dropbox_base_path"], timestamp=ts)
-                    client.put_file(path, open(t.path, "rb"))
-                    t.cleanup()
+                if conf["use_wechat"] and start_flag == 1:
+			cv2.imwrite('/home/root/galileo_dangerous.jpg',frame)
+			os.system("scp /home/root/galileo_dangerous.jpg root@xdjc.date:/root/wechat_galileo/")
+			request = urllib2.Request(
+			url = r'http://galileo.xdjc.date/?signature=1ce507b0abfa4d231b538988c01127c9e03a02ad&timestamp=1408377801&nonce=959202980',
+			headers = {'Content-Type' : 'text/xml'},
+			data = data)
+			print opener.open(request).read()
                 # 更新最近一次上传的时间戳并且重置运动
                 # 计数器
                 print "[ Dangerous! ]"
